@@ -5,6 +5,9 @@
 
     <string name="started">Pedometer started.</string>
     <string name="stopped">Pedometer stopped.</string>
+    
+    <string name="toggle_turn_on">Turn on</string>
+    <string name="toggle_turn_off">Turn off</string>
 
     <string name="steps">steps</string>
     <string name="kilometers">kilometers</string>

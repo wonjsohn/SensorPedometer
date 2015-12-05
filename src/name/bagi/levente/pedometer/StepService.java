@@ -38,6 +38,10 @@ import android.util.Log;
 import android.widget.Toast;
 
 
+//i/o
+import java.io.PrintWriter;
+import java.io.OutputStreamWriter;
+
 
 /**
  * This is an example of implementing an application service that runs locally

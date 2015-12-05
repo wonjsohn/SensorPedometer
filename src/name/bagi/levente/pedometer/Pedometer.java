@@ -19,12 +19,21 @@
 package name.bagi.levente.pedometer;
 
 
+import java.io.BufferedWriter;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
+import java.net.InetAddress;
+import java.net.Socket;
+
 import android.app.Activity;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.SharedPreferences;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
@@ -35,6 +44,8 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ToggleButton;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -49,14 +60,27 @@ public class Pedometer extends Activity {
     private TextView mStepValueView;
     private TextView mPaceValueView;
     private TextView mDistanceValueView;
-    private TextView mSpeedValueView;
-    private TextView mCaloriesValueView;
+//    private TextView mSpeedValueView;
+//    private TextView mCaloriesValueView;
+    
+    private float x=0,y=0,z=0;  // acc
+    public int PORT = 15000; 
+    //private Button connectPhones;
+    private String serverIpAddress = "192.168.0.104";
+    private boolean connected = false;   // wifi connectivity
+    boolean acc_disp = false;
+    EditText port;
+    EditText ipAdr;
+    TextView mStatus;
+    ToggleButton mlogWifiToggleButton1;
+    PrintWriter out;
+   
     TextView mDesiredPaceView;
     private int mStepValue;
     private int mPaceValue;
     private float mDistanceValue;
-    private float mSpeedValue;
-    private int mCaloriesValue;
+//    private float mSpeedValue;
+//    private int mCaloriesValue;
     private float mDesiredPaceOrSpeed;
     private int mMaintain;
     private boolean mIsMetric;
@@ -81,6 +105,7 @@ public class Pedometer extends Activity {
         setContentView(R.layout.main);
         
         mUtils = Utils.getInstance();
+        acc_disp =false;
     }
     
     @Override
@@ -116,8 +141,12 @@ public class Pedometer extends Activity {
         mStepValueView     = (TextView) findViewById(R.id.step_value);
         mPaceValueView     = (TextView) findViewById(R.id.pace_value);
         mDistanceValueView = (TextView) findViewById(R.id.distance_value);
-        mSpeedValueView    = (TextView) findViewById(R.id.speed_value);
-        mCaloriesValueView = (TextView) findViewById(R.id.calories_value);
+        
+        mStatus  = (TextView) findViewById(R.id.status);
+        mlogWifiToggleButton1 = (ToggleButton) findViewById(R.id.logWifiToggleButton1);
+        //mSpeedValueView    = (TextView) findViewById(R.id.speed_value);
+        //mCaloriesValueView = (TextView) findViewById(R.id.calories_value);
+       
         mDesiredPaceView   = (TextView) findViewById(R.id.desired_pace_value);
 
         mIsMetric = mPedometerSettings.isMetric();
@@ -126,11 +155,11 @@ public class Pedometer extends Activity {
                 ? R.string.kilometers
                 : R.string.miles
         ));
-        ((TextView) findViewById(R.id.speed_units)).setText(getString(
-                mIsMetric
-                ? R.string.kilometers_per_hour
-                : R.string.miles_per_hour
-        ));
+//        ((TextView) findViewById(R.id.speed_units)).setText(getString(
+//                mIsMetric
+//                ? R.string.kilometers_per_hour
+//                : R.string.miles_per_hour
+//        ));
         
         mMaintain = mPedometerSettings.getMaintainOption();
         ((LinearLayout) this.findViewById(R.id.desired_pace_control)).setVisibility(
@@ -147,6 +176,36 @@ public class Pedometer extends Activity {
             mDesiredPaceOrSpeed = mPedometerSettings.getDesiredSpeed();
             mMaintainInc = 0.1f;
         }
+        
+        
+        // WIFI streaming & logging of ACC, Toggle Button
+        
+        mlogWifiToggleButton1.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                // TODO 
+            	 if (!connected) {
+                     if (!serverIpAddress.equals("")) {
+                     	//text.setText("onclick if");  exception occurs
+                     	 
+                     	 mlogWifiToggleButton1.setText("Stop Streaming");
+                         Thread cThread = new Thread(new ClientThread());
+                         cThread.start();
+                         mStatus.setText("Ipadr configured");
+                        
+                     }
+                 }
+                 else{
+                	 mlogWifiToggleButton1.setText("Start Streaming");
+                     mStatus.setText("Streaming");
+                     //connectPhones.setText("don't expect here");
+                     connected=false;
+                     acc_disp=false;
+                 }
+             }
+         });
+        
+
+        
         Button button1 = (Button) findViewById(R.id.button_desired_pace_lower);
         button1.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
@@ -176,6 +235,56 @@ public class Pedometer extends Activity {
         
         displayDesiredPaceOrSpeed();
     }
+    
+    
+    
+    // this class is for streaming to ipaddress
+    public class ClientThread implements Runnable {
+        Socket socket;
+        public void run() {
+            try {
+            	//text.setText("try");
+            	//mStatus.setText("run try");
+                acc_disp=true;
+                //PORT = Integer.parseInt(port.getText().toString());
+                PORT = 15000;
+                //serverIpAddress=ipAdr.getText().toString();
+                serverIpAddress = "192.168.0.104";
+                
+                InetAddress serverAddr = InetAddress.getByName(serverIpAddress);
+                //InetAddress serverAddr = InetAddress.getByName("TURBOBEAVER");
+                socket = new Socket(serverAddr, PORT);
+                connected = true;
+                out = new PrintWriter(new BufferedWriter(new OutputStreamWriter(socket.getOutputStream())), true);
+          
+                while (connected) {
+                    out.printf("%10.2f\n", 1.00);
+                    out.flush();
+                    Thread.sleep(2);
+                }
+            } 
+            catch (Exception e) {
+            	//throw new RuntimeException(e);  //falls here? 
+            	Log.e("MYAPP", "exception", e);
+            	//statustext.setText("run catch"); // exception occurs
+            }
+            
+            finally{
+                try{
+                	//mStatus.setText("run finally");
+                    acc_disp=false;
+                    connected=false;
+                    mlogWifiToggleButton1.setText("socket closed");
+                    //out.close();
+                    socket.close();
+                }catch(Exception a){
+                }
+            }
+            
+        }
+    };
+     
+     
     
     private void displayDesiredPaceOrSpeed() {
         if (mMaintain == PedometerSettings.M_PACE) {
@@ -290,8 +399,8 @@ public class Pedometer extends Activity {
             mStepValueView.setText("0");
             mPaceValueView.setText("0");
             mDistanceValueView.setText("0");
-            mSpeedValueView.setText("0");
-            mCaloriesValueView.setText("0");
+            //mSpeedValueView.setText("0");
+            //mCaloriesValueView.setText("0");
             SharedPreferences state = getSharedPreferences("state", 0);
             SharedPreferences.Editor stateEditor = state.edit();
             if (updateDisplay) {
@@ -415,26 +524,26 @@ public class Pedometer extends Activity {
                         );
                     }
                     break;
-                case SPEED_MSG:
-                    mSpeedValue = ((int)msg.arg1)/1000f;
-                    if (mSpeedValue <= 0) { 
-                        mSpeedValueView.setText("0");
-                    }
-                    else {
-                        mSpeedValueView.setText(
-                                ("" + (mSpeedValue + 0.000001f)).substring(0, 4)
-                        );
-                    }
-                    break;
-                case CALORIES_MSG:
-                    mCaloriesValue = msg.arg1;
-                    if (mCaloriesValue <= 0) { 
-                        mCaloriesValueView.setText("0");
-                    }
-                    else {
-                        mCaloriesValueView.setText("" + (int)mCaloriesValue);
-                    }
-                    break;
+//                case SPEED_MSG:
+//                    mSpeedValue = ((int)msg.arg1)/1000f;
+//                    if (mSpeedValue <= 0) { 
+//                        mSpeedValueView.setText("0");
+//                    }
+//                    else {
+//                        mSpeedValueView.setText(
+//                                ("" + (mSpeedValue + 0.000001f)).substring(0, 4)
+//                        );
+//                    }
+//                    break;
+//                case CALORIES_MSG:
+//                    mCaloriesValue = msg.arg1;
+//                    if (mCaloriesValue <= 0) { 
+//                        mCaloriesValueView.setText("0");
+//                    }
+//                    else {
+//                        mCaloriesValueView.setText("" + (int)mCaloriesValue);
+//                    }
+//                    break;
                 default:
                     super.handleMessage(msg);
             }
@@ -442,5 +551,30 @@ public class Pedometer extends Activity {
         
     };
     
-
+    
+    private SensorEventListener accelerationListener = new SensorEventListener() {
+        
+        @Override
+        public void onAccuracyChanged(Sensor sensor, int acc) {
+        	
+        }
+        @Override
+        public void onSensorChanged(SensorEvent event) {
+        	
+            x = event.values[0];
+            y = event.values[1];
+            z = event.values[2];
+            refreshDisplay();
+        }
+    };
+     
+    private void refreshDisplay() {
+    	//text.setText("refreshDisplay");
+        if(acc_disp == true){
+            String output = String.format("X:%3.2f m/s^2  |  Y:%3.2f m/s^2  |   Z:%3.2f m/s^2", x, y, z);
+            //mStatus.setText(output);
+        }
+    }
 }
+    
+

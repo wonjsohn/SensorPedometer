@@ -26,6 +26,8 @@ import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.util.Log;
 
+
+
 /**
  * Detects steps and notifies all listeners (that implement StepListener).
  * @author Levente Bagi
@@ -51,6 +53,7 @@ public class StepDetector implements SensorEventListener
         mYOffset = h * 0.5f;
         mScale[0] = - (h * 0.5f * (1.0f / (SensorManager.STANDARD_GRAVITY * 2)));
         mScale[1] = - (h * 0.5f * (1.0f / (SensorManager.MAGNETIC_FIELD_EARTH_MAX)));
+        Log.d("Sohn", "Mag field max =" + SensorManager.MAGNETIC_FIELD_EARTH_MAX ); //60
     }
     
     public void setSensitivity(float sensitivity) {
@@ -93,8 +96,8 @@ public class StepDetector implements SensorEventListener
                             
                             if (isAlmostAsLargeAsPrevious && isPreviousLargeEnough && isNotContra) {
                                 Log.i(TAG, "step");
-                                for (StepListener stepListener : mStepListeners) {
-                                    stepListener.onStep();
+                                for (StepListener stepListener : mStepListeners) { // for all stepListeners, onStep()?
+                                    stepListener.onStep();  // updates UI text values. 
                                 }
                                 mLastMatch = extType;
                             }
@@ -110,6 +113,7 @@ public class StepDetector implements SensorEventListener
             }
         }
     }
+
     
     public void onAccuracyChanged(Sensor sensor, int accuracy) {
         // TODO Auto-generated method stub
