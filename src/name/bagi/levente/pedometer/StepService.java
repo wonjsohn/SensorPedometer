@@ -63,7 +63,8 @@ public class StepService extends Service {
     private Utils mUtils;
     private SensorManager mSensorManager;
     private Sensor mSensor;
-    private StepDetector mStepDetector;
+    //private StepDetector mStepDetector;
+    public StepDetector mStepDetector;  // to access from outside : eric
     // private StepBuzzer mStepBuzzer; // used for debugging
     private StepDisplayer mStepDisplayer;
     private PaceNotifier mPaceNotifier;

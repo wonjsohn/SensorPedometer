@@ -46,6 +46,9 @@ public class StepDetector implements SensorEventListener
     private float   mLastDiff[] = new float[3*2];
     private int     mLastMatch = -1;
     
+    public float acc_net;  // acc scaled in x, y, z.
+    public int step;  // step detection information 
+    
     private ArrayList<StepListener> mStepListeners = new ArrayList<StepListener>();
     
     public StepDetector() {
@@ -53,6 +56,7 @@ public class StepDetector implements SensorEventListener
         mYOffset = h * 0.5f;
         mScale[0] = - (h * 0.5f * (1.0f / (SensorManager.STANDARD_GRAVITY * 2)));
         mScale[1] = - (h * 0.5f * (1.0f / (SensorManager.MAGNETIC_FIELD_EARTH_MAX)));
+        step = 0; //initial value
         Log.d("Sohn", "Mag field max =" + SensorManager.MAGNETIC_FIELD_EARTH_MAX ); //60
     }
     
@@ -75,11 +79,12 @@ public class StepDetector implements SensorEventListener
                 if (j == 1) {
                     float vSum = 0;
                     for (int i=0 ; i<3 ; i++) {
-                        final float v = mYOffset + event.values[i] * mScale[j];
+                        final float v = mYOffset + event.values[i] * mScale[j]; //event.values: x, y, z?
                         vSum += v;
                     }
                     int k = 0;
                     float v = vSum / 3;
+                    acc_net = v;  // to access acc from outside
                     
                     float direction = (v > mLastValues[k] ? 1 : (v < mLastValues[k] ? -1 : 0));
                     if (direction == - mLastDirections[k]) {
@@ -96,6 +101,7 @@ public class StepDetector implements SensorEventListener
                             
                             if (isAlmostAsLargeAsPrevious && isPreviousLargeEnough && isNotContra) {
                                 Log.i(TAG, "step");
+                                step = step +  1;
                                 for (StepListener stepListener : mStepListeners) { // for all stepListeners, onStep()?
                                     stepListener.onStep();  // updates UI text values. 
                                 }

@@ -25,6 +25,11 @@ import java.io.PrintWriter;
 import java.net.InetAddress;
 import java.net.Socket;
 
+import name.bagi.levente.pedometer.AdvancedMultipleSeriesGraph;
+//import com.jjoe64.graphviewdemos.MainActivity;
+import name.bagi.levente.pedometer.R;
+import name.bagi.levente.pedometer.RealtimeGraph;
+
 import android.app.Activity;
 import android.content.ComponentName;
 import android.content.Context;
@@ -43,11 +48,14 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.View.OnClickListener;
 import android.widget.Button;
 import android.widget.ToggleButton;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.RadioButton;
 import android.widget.TextView;
+import android.widget.Toast;
 
 
 
@@ -75,6 +83,11 @@ public class Pedometer extends Activity {
     ToggleButton mlogWifiToggleButton1;
     PrintWriter out;
    
+    // acceleration and step detection related. 
+    //private StepDetector mStepDector;
+    private  float acc_net = 0;
+    private int step=0;
+    
     TextView mDesiredPaceView;
     private int mStepValue;
     private int mPaceValue;
@@ -86,7 +99,7 @@ public class Pedometer extends Activity {
     private boolean mIsMetric;
     private float mMaintainInc;
     private boolean mQuitting = false; // Set when user selected Quit from menu, can be used by onPause, onStop, onDestroy
-
+    
     
     /**
      * True, when service is running.
@@ -136,7 +149,7 @@ public class Pedometer extends Activity {
             bindStepService();
         }
         
-        mPedometerSettings.clearServiceRunning();
+        mPedometerSettings.clearServiceRunning();//?
 
         mStepValueView     = (TextView) findViewById(R.id.step_value);
         mPaceValueView     = (TextView) findViewById(R.id.pace_value);
@@ -232,10 +245,24 @@ public class Pedometer extends Activity {
             );
         }
         
-        
         displayDesiredPaceOrSpeed();
+        
+        // real time graph 
+		((Button) findViewById(R.id.realtimegraph)).setOnClickListener(new OnClickListener() {
+			@Override
+			public void onClick(View v) {
+				startGraphActivity(RealtimeGraph.class);
+			}
+		});
+        
     }
     
+	private void startGraphActivity(Class<? extends Activity> activity) {
+		Intent intent = new Intent(Pedometer.this, activity);
+		intent.putExtra("type", "line");
+		
+		startActivity(intent);
+	}
     
     
     // this class is for streaming to ipaddress
@@ -258,7 +285,8 @@ public class Pedometer extends Activity {
                 out = new PrintWriter(new BufferedWriter(new OutputStreamWriter(socket.getOutputStream())), true);
           
                 while (connected) {
-                    out.printf("%10.2f\n", 1.00);
+                    out.printf("%10.2f\n", mService.mStepDetector.acc_net-240);
+                    out.printf("%10.2f\n",  (float)mService.mStepDetector.step);
                     out.flush();
                     Thread.sleep(2);
                 }
@@ -348,7 +376,7 @@ public class Pedometer extends Activity {
     
     private ServiceConnection mConnection = new ServiceConnection() {
         public void onServiceConnected(ComponentName className, IBinder service) {
-            mService = ((StepService.StepBinder)service).getService();
+            mService = ((StepService.StepBinder)service).getService();  //return StepService.this
 
             mService.registerCallback(mCallback);
             mService.reloadSettings();
@@ -552,27 +580,28 @@ public class Pedometer extends Activity {
     };
     
     
-    private SensorEventListener accelerationListener = new SensorEventListener() {
-        
-        @Override
-        public void onAccuracyChanged(Sensor sensor, int acc) {
-        	
-        }
-        @Override
-        public void onSensorChanged(SensorEvent event) {
-        	
-            x = event.values[0];
-            y = event.values[1];
-            z = event.values[2];
-            refreshDisplay();
-        }
-    };
+//    private SensorEventListener accelerationListener = new SensorEventListener() {
+//        
+//        @Override
+//        public void onAccuracyChanged(Sensor sensor, int acc) {
+//        	
+//        }
+//        @Override
+//        public void onSensorChanged(SensorEvent event) {
+//        	
+//            x = event.values[0];
+//            y = event.values[1];
+//            z = event.values[2];
+//            refreshDisplay();
+//        }
+//    };
      
     private void refreshDisplay() {
     	//text.setText("refreshDisplay");
         if(acc_disp == true){
-            String output = String.format("X:%3.2f m/s^2  |  Y:%3.2f m/s^2  |   Z:%3.2f m/s^2", x, y, z);
-            //mStatus.setText(output);
+        	acc_net = mService.mStepDetector.acc_net;
+            String output = String.format("X:%3.2f m/s^2  |  Y:%3.2f m/s^2  |   Z:%3.2f m/s^2", acc_net, acc_net, acc_net);
+            mStatus.setText(output);
         }
     }
 }

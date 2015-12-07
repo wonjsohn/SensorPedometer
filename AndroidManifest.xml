@@ -5,6 +5,9 @@
       android:installLocation="auto">
       
     <uses-sdk android:minSdkVersion="4" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+	<uses-permission android:name="android.permission.BLUETOOTH" />      
+    
     <uses-permission android:name="android.permission.INTERNET" >
 		</uses-permission>	
 	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" >	
@@ -21,6 +24,9 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        
+        <activity android:name=".RealtimeGraph"></activity>
+        
         <activity android:name=".Settings"
                 android:label="@string/activity_settings">
             <intent-filter>
