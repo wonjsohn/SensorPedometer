@@ -1,6 +1,6 @@
 /*
- *  Pedometer - Android App
- *  Copyright (C) 2009 Levente Bagi
+ *  Sensor + Pedometer - Android App
+ *  Copyright (C) 2009 Levente Bagi, Enhanced by Won Joon (Eric) Sohn, 2015. 
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -25,10 +25,10 @@ import java.io.PrintWriter;
 import java.net.InetAddress;
 import java.net.Socket;
 
-import name.bagi.levente.pedometer.AdvancedMultipleSeriesGraph;
+//import name.bagi.levente.pedometer.AdvancedMultipleSeriesGraph;
 //import com.jjoe64.graphviewdemos.MainActivity;
 import name.bagi.levente.pedometer.R;
-import name.bagi.levente.pedometer.RealtimeGraph;
+//import name.bagi.levente.pedometer.RealtimeGraph;
 
 import android.app.Activity;
 import android.content.ComponentName;
@@ -59,7 +59,7 @@ import android.widget.Toast;
 
 
 
-public class Pedometer extends Activity {
+public class SensorPedometer extends Activity {
 	private static final String TAG = "Pedometer";
     private SharedPreferences mSettings;
     private PedometerSettings mPedometerSettings;
@@ -247,22 +247,36 @@ public class Pedometer extends Activity {
         
         displayDesiredPaceOrSpeed();
         
-        // real time graph 
-		((Button) findViewById(R.id.realtimegraph)).setOnClickListener(new OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				startGraphActivity(RealtimeGraph.class);
-			}
-		});
+        
+       //startGraphActivity(RealtimeGraph.class);  // Only allow one activity. It is a mess trying to run multiple activity concurrently. 
+        
+//        // real time graph 
+//		((Button) findViewById(R.id.realtimegraph)).setOnClickListener(new OnClickListener() {
+//			@Override
+//			public void onClick(View v) {
+//				startGraphActivity(RealtimeGraph.class);
+//			}
+//		});
+		
+		// Advanced multiple series graph
+//		((Button) findViewById(R.id.realtimegraph)).setOnClickListener(new OnClickListener() {
+//			@Override
+//			public void onClick(View v) {
+//				startGraphActivity(AdvancedMultipleSeriesGraph.class);
+//			}
+//		});
         
     }
     
+    /*
 	private void startGraphActivity(Class<? extends Activity> activity) {
-		Intent intent = new Intent(Pedometer.this, activity);
+		Intent intent = new Intent(SensorPedometer.this, activity);
+		//intent.setFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);  // to run to activities at the same time...?
 		intent.putExtra("type", "line");
 		
-		startActivity(intent);
+		startActivity(intent); 
 	}
+	*/
     
     
     // this class is for streaming to ipaddress
@@ -393,14 +407,14 @@ public class Pedometer extends Activity {
         if (! mIsRunning) {
             Log.i(TAG, "[SERVICE] Start");
             mIsRunning = true;
-            startService(new Intent(Pedometer.this,
+            startService(new Intent(SensorPedometer.this,
                     StepService.class));
         }
     }
     
     private void bindStepService() {
         Log.i(TAG, "[SERVICE] Bind");
-        bindService(new Intent(Pedometer.this, 
+        bindService(new Intent(SensorPedometer.this, 
                 StepService.class), mConnection, Context.BIND_AUTO_CREATE + Context.BIND_DEBUG_UNBIND);
     }
 
@@ -413,7 +427,7 @@ public class Pedometer extends Activity {
         Log.i(TAG, "[SERVICE] Stop");
         if (mService != null) {
             Log.i(TAG, "[SERVICE] stopService");
-            stopService(new Intent(Pedometer.this,
+            stopService(new Intent(SensorPedometer.this,
                   StepService.class));
         }
         mIsRunning = false;

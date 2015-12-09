@@ -9,6 +9,7 @@ import android.content.Context;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.util.Log;
 import android.widget.LinearLayout;
 import android.widget.Toast;
 
@@ -23,7 +24,7 @@ import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 
-//@TargetApi(Build.VERSION_CODES.JELLY_BEAN)
+//@TargetApi(Build.VERSION_CODES.JELLY_BEAN) 
 public class RealtimeGraph extends Activity implements SensorEventListener {
 	private final Handler mHandler = new Handler();
 	private Runnable mTimer1;
@@ -45,12 +46,13 @@ public class RealtimeGraph extends Activity implements SensorEventListener {
 
 	//the Sensor Manager
 	private SensorManager sManager;
+	private Sensor sensor;
 
 	/** Called when the activity is first created. */
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
-		setContentView(R.layout.graphs);
+		setContentView(R.layout.main); // graphs
 				
 		seriesX = new ArrayList<GraphViewData>();
 		seriesY = new ArrayList<GraphViewData>();
@@ -58,7 +60,8 @@ public class RealtimeGraph extends Activity implements SensorEventListener {
 		
         //get a hook to the sensor service
         sManager = (SensorManager) getSystemService(SENSOR_SERVICE);
-
+        sensor = sManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+        
 		// init example series data
 		exampleSeries1 = new GraphViewSeries(new GraphViewData[] {});		
 		if (getIntent().getStringExtra("type").equals("bar")) {
@@ -118,40 +121,57 @@ public class RealtimeGraph extends Activity implements SensorEventListener {
 	@Override
 	public void onSensorChanged(SensorEvent event)
 	{
-		//if sensor is unreliable, return void
-		if (event.accuracy == SensorManager.SENSOR_STATUS_UNRELIABLE)
-		{
-			return;
-		}
-		sensorX = event.values[2];
-		sensorY = event.values[1];
-		sensorZ = event.values[0];
-
-		seriesX.add(new GraphViewData(dataCount, sensorX));
-		seriesY.add(new GraphViewData(dataCount, sensorY));
-		seriesZ.add(new GraphViewData(dataCount, sensorZ));
 		
-		dataCount++;
+//		//if sensor is unreliable, return void
+//		if (event.accuracy == SensorManager.SENSOR_STATUS_UNRELIABLE)  // WANRING : DON'T DO THIS IN LOW-END DEVICES b/c ITS ALL YOU GET
+//		{
+//			return;
+//		}
 		
 		
-/*		Context context = getApplicationContext();
-		float number = (float)Math.round(sensorX * 1000) / 1000;
-		//string formattedNumber = Float.toString(number);
-		CharSequence text = Float.toString(number);
-		int duration = Toast.LENGTH_SHORT;
-		Toast toast = Toast.makeText(context, text, duration);
-		toast.show();
-*/		
-		if (seriesX.size() > 500) {
-			seriesX.remove(0);
-			seriesY.remove(0);
-			seriesZ.remove(0);
-			graphView1.setViewPort(dataCount - 500, 500);
-			graphView2.setViewPort(dataCount - 500, 500);
-			graphView3.setViewPort(dataCount - 500, 500);
-		}
+	    //Sensor sensor = event.sensor; 
+	    
+	    if (sManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) != null) {
+			// success! we have an accelerometer
+		
+			sensorX = event.values[2];
+			Log.d("MYAPP", "sensorX " + sensorX);
+			sensorY = event.values[1];
+			sensorZ = event.values[0];
 	
+			seriesX.add(new GraphViewData(dataCount, sensorX));
+			seriesY.add(new GraphViewData(dataCount, sensorY));
+			seriesZ.add(new GraphViewData(dataCount, sensorZ));
+	    
+		
+			dataCount++;
+		
+		
+	/*		Context context = getApplicationContext();
+			float number = (float)Math.round(sensorX * 1000) / 1000;
+			//string formattedNumber = Float.toString(number);
+			CharSequence text = Float.toString(number);
+			int duration = Toast.LENGTH_SHORT;
+			Toast toast = Toast.makeText(context, text, duration);
+			toast.show();
+	*/		
+			if (seriesX.size() > 500) {
+				seriesX.remove(0);
+				seriesY.remove(0);
+				seriesZ.remove(0);
+				graphView1.setViewPort(dataCount - 500, 500);
+				graphView2.setViewPort(dataCount - 500, 500);
+				graphView3.setViewPort(dataCount - 500, 500);
+			}
+	    }
+	    else {
+		// fail! we dont have an accelerometer!
+	    	Log.d("MYAPP", "no acc");
+	    	Toast.makeText(this, "No accelerometer", Toast.LENGTH_LONG).show();
+	    }
 	}
+	
+	
 	
 	@Override
 	public void onAccuracyChanged(Sensor arg0, int arg1)
@@ -178,7 +198,9 @@ public class RealtimeGraph extends Activity implements SensorEventListener {
 	protected void onResume() {
 		super.onResume();
 		
-		sManager.registerListener(this, sManager.getDefaultSensor(Sensor.TYPE_ORIENTATION),SensorManager.SENSOR_DELAY_FASTEST);
+		// TYPE_ORIENTATION works. all other doesn't. why?
+		//sManager.registerListener(this, sManager.getDefaultSensor(Sensor.TYPE_ORIENTATION),SensorManager.SENSOR_DELAY_FASTEST);
+		sManager.registerListener(this, sensor ,SensorManager.SENSOR_DELAY_FASTEST);
 		
 		mTimer1 = new Runnable() {
 			@Override
@@ -189,7 +211,7 @@ public class RealtimeGraph extends Activity implements SensorEventListener {
 				mHandler.post(this); //, 100);
 			}
 		};
-		mHandler.postDelayed(mTimer1, 100);
+		mHandler.postDelayed(mTimer1, 50);
 
 		mTimer2 = new Runnable() {
 			@Override
@@ -202,7 +224,7 @@ public class RealtimeGraph extends Activity implements SensorEventListener {
 				mHandler.post(this);
 			}
 		};
-		mHandler.postDelayed(mTimer2, 100);
+		mHandler.postDelayed(mTimer2, 50);
 
 	
 		mTimer3 = new Runnable() {
@@ -216,6 +238,14 @@ public class RealtimeGraph extends Activity implements SensorEventListener {
 				mHandler.post(this);
 			}
 		};
-		mHandler.postDelayed(mTimer3, 100);
+		mHandler.postDelayed(mTimer3, 50);
 	}
+	
+
+	protected void onDestroy() {
+	    Log.i("TAG", "[ACTIVITY] onDestroy");
+	    super.onDestroy();
 }
+	
+}
+

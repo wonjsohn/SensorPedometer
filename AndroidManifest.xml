@@ -4,7 +4,7 @@
       android:versionCode="5" android:versionName="1.4.0"
       android:installLocation="auto">
       
-    <uses-sdk android:minSdkVersion="4" />
+    <uses-sdk android:minSdkVersion="19" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
 	<uses-permission android:name="android.permission.BLUETOOTH" />      
     
@@ -15,8 +15,8 @@
 
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
-    <application android:icon="@drawable/icon" android:label="@string/app_name">
-        <activity android:name=".Pedometer"
+    <application android:icon="@drawable/newicon2" android:label="@string/app_name">
+        <activity android:name=".SensorPedometer"
                   android:label="@string/app_name"
                   android:configChanges="orientation">
             <intent-filter>
@@ -34,7 +34,9 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
-
+        
+		<activity android:name=".subactivity.RealtimeGraph" />
+        
         <service android:name=".StepService"/>
 
     </application>
