@@ -46,7 +46,7 @@ public class StepDetector implements SensorEventListener
     private float   mLastDiff[] = new float[3*2];
     private int     mLastMatch = -1;
     
-    public float acc_net;  // acc scaled in x, y, z.
+    public double acc_net;  // acc scaled in x, y, z.
     public int step;  // step detection information 
     
     private ArrayList<StepListener> mStepListeners = new ArrayList<StepListener>();

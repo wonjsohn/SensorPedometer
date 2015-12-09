@@ -26,6 +26,7 @@ import java.net.InetAddress;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
+//import java.math.round;
 
 import com.jjoe64.graphview.BarGraphView;
 import com.jjoe64.graphview.GraphView;
@@ -95,7 +96,7 @@ public class SensorPedometer extends Activity implements SensorEventListener  {
    
     // acceleration and step detection related. 
     //private StepDetector mStepDector;
-    private  float acc_net = 0;
+    private  double acc_net = 0;
     private int step=0;
     
     TextView mDesiredPaceView;
@@ -113,18 +114,23 @@ public class SensorPedometer extends Activity implements SensorEventListener  {
     
     // for real time graph
 	private final Handler mHandler2 = new Handler();  // check if commenting this produce trouble
+	private Runnable mTimer0;
 	private Runnable mTimer1;
 	private Runnable mTimer2;
 	private Runnable mTimer3;	
+	private GraphView graphView0;
 	private GraphView graphView1;
 	private GraphView graphView2;
 	private GraphView graphView3;
+	private GraphViewSeries exampleSeries0;
 	private GraphViewSeries exampleSeries1;
 	private GraphViewSeries exampleSeries2;
 	private GraphViewSeries exampleSeries3;
+	private double sensorXYZ = 0;  // calculated weight xyz acc mean 
 	private double sensorX = 0;
 	private double sensorY = 0;
 	private double sensorZ = 0;
+	private List<GraphViewData> seriesXYZ;
 	private List<GraphViewData> seriesX;
 	private List<GraphViewData> seriesY;
 	private List<GraphViewData> seriesZ;
@@ -134,7 +140,7 @@ public class SensorPedometer extends Activity implements SensorEventListener  {
 	private SensorManager sManager;
 	private Sensor sensor;
     
-    
+
     /**
      * True, when service is running.
      */
@@ -155,9 +161,13 @@ public class SensorPedometer extends Activity implements SensorEventListener  {
         acc_disp =false;
         
         // for real time graph
+        seriesXYZ = new ArrayList<GraphViewData>();
         seriesX = new ArrayList<GraphViewData>();
 		seriesY = new ArrayList<GraphViewData>();
 		seriesZ = new ArrayList<GraphViewData>();
+		
+	
+		
 		
 		
         //get a hook to the sensor service
@@ -168,19 +178,32 @@ public class SensorPedometer extends Activity implements SensorEventListener  {
 		
         
 		// init example series data
+        
+        exampleSeries0 = new GraphViewSeries(new GraphViewData[] {});	
+
+		graphView0 = new LineGraphView(
+				this // context
+				, "Group ACC" // heading
+		);
+
+
+		graphView0.addSeries(exampleSeries0); // data
+		LinearLayout layout = (LinearLayout) findViewById(R.id.graph0);
+		layout.addView(graphView0);
+
+		Log.i(TAG, "[onCreate] graph0 registered ");
+        
+        //---------
 		exampleSeries1 = new GraphViewSeries(new GraphViewData[] {});	
 
-		Log.i(TAG, "[onCreate] 3 ");
 		graphView1 = new LineGraphView(
 				this // context
-				, "GraphViewDemo" // heading
+				, "ACC-X" // heading
 		);
-		Log.i(TAG, "[onCreate] 4 ");
-		
-		Log.i(TAG, "[onCreate] 5 ");
+
+
 		graphView1.addSeries(exampleSeries1); // data
-		Log.i(TAG, "[onCreate] 6 ");
-		LinearLayout layout = (LinearLayout) findViewById(R.id.graph1);
+		layout = (LinearLayout) findViewById(R.id.graph1);
 		layout.addView(graphView1);
 
 		Log.i(TAG, "[onCreate] graph1 registered ");
@@ -190,7 +213,7 @@ public class SensorPedometer extends Activity implements SensorEventListener  {
 		
 		graphView2 = new LineGraphView(
 				this
-				, "GraphViewDemo"
+				, "ACC-Y"
 		);
 		//((LineGraphView) graphView).setDrawBackground(true);
 		
@@ -204,7 +227,7 @@ public class SensorPedometer extends Activity implements SensorEventListener  {
 
 		graphView3 = new LineGraphView(
 				this // context
-				, "GraphViewDemo" // heading
+				, "ACC-Z" // heading
 		);
 		
 		graphView3.addSeries(exampleSeries3); // data
@@ -219,31 +242,30 @@ public class SensorPedometer extends Activity implements SensorEventListener  {
 	public void onSensorChanged(SensorEvent event)
 	{
 		
-//		//if sensor is unreliable, return void
-//		if (event.accuracy == SensorManager.SENSOR_STATUS_UNRELIABLE)  // WANRING : DON'T DO THIS IN LOW-END DEVICES b/c ITS ALL YOU GET
-//		{
-//			return;
-//		}
-		
-		
 //	    Sensor sensor = event.sensor; 
-		
-		
-
-	    
+  
 	    if (sManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) != null) {
 			// success! we have an accelerometer
-		
+	    	
+	    	// THESE TWO LINES NEED TO BE IMPROVED. WHY DOES IT WORK THIS 
+	    	Thread accThread1 = new Thread(new AccThread());
+            accThread1.start();
+
+	    	sensorXYZ = acc_net;  // not sure if this gets a snapshot value of acc_net upon sensor event
+	    	//sensorXYZ = mService.mStepDetector.acc_net;
+	    	
+	    	
+	    	
 			sensorX = event.values[2];
-			Log.d("MYAPP", "sensorX " + sensorX);
+//			Log.d("MYAPP", "sensorX " + sensorX);
 			sensorY = event.values[1];
 			sensorZ = event.values[0];
 	
+			seriesXYZ.add(new GraphViewData(dataCount, sensorXYZ));
 			seriesX.add(new GraphViewData(dataCount, sensorX));
 			seriesY.add(new GraphViewData(dataCount, sensorY));
 			seriesZ.add(new GraphViewData(dataCount, sensorZ));
 	    
-		
 			dataCount++;
 		
 		
@@ -256,9 +278,11 @@ public class SensorPedometer extends Activity implements SensorEventListener  {
 			toast.show();
 	*/		
 			if (seriesX.size() > 500) {
+				seriesXYZ.remove(0);
 				seriesX.remove(0);
 				seriesY.remove(0);
 				seriesZ.remove(0);
+				graphView0.setViewPort(dataCount - 500, 500);
 				graphView1.setViewPort(dataCount - 500, 500);
 				graphView2.setViewPort(dataCount - 500, 500);
 				graphView3.setViewPort(dataCount - 500, 500);
@@ -351,7 +375,7 @@ public class SensorPedometer extends Activity implements SensorEventListener  {
             mMaintainInc = 0.1f;
         }
         
-        
+
         // WIFI streaming & logging of ACC, Toggle Button
         
         mlogWifiToggleButton1.setOnClickListener(new View.OnClickListener() {
@@ -360,10 +384,11 @@ public class SensorPedometer extends Activity implements SensorEventListener  {
             	 if (!connected) {
                      if (!serverIpAddress.equals("")) {
                      	//text.setText("onclick if");  exception occurs
-                     	 
                      	 mlogWifiToggleButton1.setText("Stop Streaming");
                          Thread cThread = new Thread(new ClientThread());
                          cThread.start();
+                     	// to call 
+                 		
                          mStatus.setText("Ipadr configured");
                         
                      }
@@ -419,17 +444,32 @@ public class SensorPedometer extends Activity implements SensorEventListener  {
 //			}
 //		});
 		
-		// Advanced multiple series graph
-//		((Button) findViewById(R.id.realtimegraph)).setOnClickListener(new OnClickListener() {
-//			@Override
-//			public void onClick(View v) {
-//				startGraphActivity(AdvancedMultipleSeriesGraph.class);
-//			}
-//		});
+		 //Advanced multiple series graph
+		((Button) findViewById(R.id.realtimegraph)).setOnClickListener(new OnClickListener() {
+			@Override
+			public void onClick(View v) {
+				//startGraphActivity(AdvancedMultipleSeriesGraph.class);
+				Thread accThread1 = new Thread(new AccThread());
+                accThread1.start();
+				
+			}
+		});
         
         //for real time graph
         sManager.registerListener(this, sensor ,SensorManager.SENSOR_DELAY_FASTEST);
 		
+        
+        mTimer0 = new Runnable() {
+			@Override
+			public void run() {		
+				GraphViewData[] gvd = new GraphViewData[seriesXYZ.size()];				
+				seriesXYZ.toArray(gvd);
+				exampleSeries0.resetData(gvd);
+				mHandler2.post(this); //, 100);
+			}
+		};
+		mHandler2.postDelayed(mTimer0, 50);
+        
 		mTimer1 = new Runnable() {
 			@Override
 			public void run() {			
@@ -479,6 +519,17 @@ public class SensorPedometer extends Activity implements SensorEventListener  {
 //		startActivity(intent); 
 //	}
 	
+    public class AccThread implements Runnable {
+    	public void run() {
+    		try{
+    			acc_net = mService.mStepDetector.acc_net;
+    		}catch(Exception e) {
+            	//throw new RuntimeException(e);  //falls here? 
+            	Log.e("MYAPP", "acc thread exception", e);
+            	//statustext.setText("run catch"); // exception occurs
+            }
+    	}
+    }
     
     
     // this class is for streaming to ipaddress
@@ -486,22 +537,27 @@ public class SensorPedometer extends Activity implements SensorEventListener  {
         Socket socket;
         public void run() {
             try {
+            	
             	//text.setText("try");
             	//mStatus.setText("run try");
                 acc_disp=true;
                 //PORT = Integer.parseInt(port.getText().toString());
                 PORT = 15000;
                 //serverIpAddress=ipAdr.getText().toString();
-                serverIpAddress = "192.168.0.104";
+                serverIpAddress = "192.168.0.106";
                 
+               
                 InetAddress serverAddr = InetAddress.getByName(serverIpAddress);
                 //InetAddress serverAddr = InetAddress.getByName("TURBOBEAVER");
+                
                 socket = new Socket(serverAddr, PORT);
+                
                 connected = true;
                 out = new PrintWriter(new BufferedWriter(new OutputStreamWriter(socket.getOutputStream())), true);
-          
+                
+                
                 while (connected) {
-                    out.printf("%10.2f\n", mService.mStepDetector.acc_net-240);
+                    out.printf("%10.2f\n", acc_net-240);
                     out.printf("%10.2f\n",  (float)mService.mStepDetector.step);
                     out.flush();
                     Thread.sleep(2);
