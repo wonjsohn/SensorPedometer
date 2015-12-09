@@ -24,6 +24,14 @@ import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.InetAddress;
 import java.net.Socket;
+import java.util.ArrayList;
+import java.util.List;
+
+import com.jjoe64.graphview.BarGraphView;
+import com.jjoe64.graphview.GraphView;
+import com.jjoe64.graphview.GraphViewSeries;
+import com.jjoe64.graphview.LineGraphView;
+import com.jjoe64.graphview.GraphView.GraphViewData;
 
 //import name.bagi.levente.pedometer.AdvancedMultipleSeriesGraph;
 //import com.jjoe64.graphviewdemos.MainActivity;
@@ -57,9 +65,11 @@ import android.widget.RadioButton;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import android.hardware.SensorManager;
 
 
-public class SensorPedometer extends Activity {
+public class SensorPedometer extends Activity implements SensorEventListener  {
+//public class SensorPedometer extends Activity {
 	private static final String TAG = "Pedometer";
     private SharedPreferences mSettings;
     private PedometerSettings mPedometerSettings;
@@ -101,6 +111,30 @@ public class SensorPedometer extends Activity {
     private boolean mQuitting = false; // Set when user selected Quit from menu, can be used by onPause, onStop, onDestroy
     
     
+    // for real time graph
+	private final Handler mHandler2 = new Handler();  // check if commenting this produce trouble
+	private Runnable mTimer1;
+	private Runnable mTimer2;
+	private Runnable mTimer3;	
+	private GraphView graphView1;
+	private GraphView graphView2;
+	private GraphView graphView3;
+	private GraphViewSeries exampleSeries1;
+	private GraphViewSeries exampleSeries2;
+	private GraphViewSeries exampleSeries3;
+	private double sensorX = 0;
+	private double sensorY = 0;
+	private double sensorZ = 0;
+	private List<GraphViewData> seriesX;
+	private List<GraphViewData> seriesY;
+	private List<GraphViewData> seriesZ;
+	int dataCount = 1;
+
+	//the Sensor Manager
+	private SensorManager sManager;
+	private Sensor sensor;
+    
+    
     /**
      * True, when service is running.
      */
@@ -119,7 +153,134 @@ public class SensorPedometer extends Activity {
         
         mUtils = Utils.getInstance();
         acc_disp =false;
+        
+        // for real time graph
+        seriesX = new ArrayList<GraphViewData>();
+		seriesY = new ArrayList<GraphViewData>();
+		seriesZ = new ArrayList<GraphViewData>();
+		
+		
+        //get a hook to the sensor service
+        sManager = (SensorManager) getSystemService(SENSOR_SERVICE);
+        sensor = sManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+        Log.i(TAG, "[onCreate] sensor registered ");
+		
+		
+        
+		// init example series data
+		exampleSeries1 = new GraphViewSeries(new GraphViewData[] {});	
+
+		Log.i(TAG, "[onCreate] 3 ");
+		graphView1 = new LineGraphView(
+				this // context
+				, "GraphViewDemo" // heading
+		);
+		Log.i(TAG, "[onCreate] 4 ");
+		
+		Log.i(TAG, "[onCreate] 5 ");
+		graphView1.addSeries(exampleSeries1); // data
+		Log.i(TAG, "[onCreate] 6 ");
+		LinearLayout layout = (LinearLayout) findViewById(R.id.graph1);
+		layout.addView(graphView1);
+
+		Log.i(TAG, "[onCreate] graph1 registered ");
+		
+		// ----------
+		exampleSeries2 = new GraphViewSeries(new GraphViewData[] {});
+		
+		graphView2 = new LineGraphView(
+				this
+				, "GraphViewDemo"
+		);
+		//((LineGraphView) graphView).setDrawBackground(true);
+		
+		graphView2.addSeries(exampleSeries2); // data
+		layout = (LinearLayout) findViewById(R.id.graph2);
+		layout.addView(graphView2);
+
+		
+		// init example series data
+		exampleSeries3 = new GraphViewSeries(new GraphViewData[] {});
+
+		graphView3 = new LineGraphView(
+				this // context
+				, "GraphViewDemo" // heading
+		);
+		
+		graphView3.addSeries(exampleSeries3); // data
+		layout = (LinearLayout) findViewById(R.id.graph3);
+		layout.addView(graphView3);
+		
+        
     }
+    
+    
+	@Override
+	public void onSensorChanged(SensorEvent event)
+	{
+		
+//		//if sensor is unreliable, return void
+//		if (event.accuracy == SensorManager.SENSOR_STATUS_UNRELIABLE)  // WANRING : DON'T DO THIS IN LOW-END DEVICES b/c ITS ALL YOU GET
+//		{
+//			return;
+//		}
+		
+		
+//	    Sensor sensor = event.sensor; 
+		
+		
+
+	    
+	    if (sManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) != null) {
+			// success! we have an accelerometer
+		
+			sensorX = event.values[2];
+			Log.d("MYAPP", "sensorX " + sensorX);
+			sensorY = event.values[1];
+			sensorZ = event.values[0];
+	
+			seriesX.add(new GraphViewData(dataCount, sensorX));
+			seriesY.add(new GraphViewData(dataCount, sensorY));
+			seriesZ.add(new GraphViewData(dataCount, sensorZ));
+	    
+		
+			dataCount++;
+		
+		
+	/*		Context context = getApplicationContext();
+			float number = (float)Math.round(sensorX * 1000) / 1000;
+			//string formattedNumber = Float.toString(number);
+			CharSequence text = Float.toString(number);
+			int duration = Toast.LENGTH_SHORT;
+			Toast toast = Toast.makeText(context, text, duration);
+			toast.show();
+	*/		
+			if (seriesX.size() > 500) {
+				seriesX.remove(0);
+				seriesY.remove(0);
+				seriesZ.remove(0);
+				graphView1.setViewPort(dataCount - 500, 500);
+				graphView2.setViewPort(dataCount - 500, 500);
+				graphView3.setViewPort(dataCount - 500, 500);
+			}
+	    }
+	    else {
+		// fail! we dont have an accelerometer!
+	    	Log.d("MYAPP", "no acc");
+	    	Toast.makeText(this, "No accelerometer", Toast.LENGTH_LONG).show();
+	    }
+	}
+	
+	
+	
+	@Override
+	public void onAccuracyChanged(Sensor arg0, int arg1)
+	{
+		//Do nothing.
+	}
+    
+    
+    
     
     @Override
     protected void onStart() {
@@ -248,7 +409,7 @@ public class SensorPedometer extends Activity {
         displayDesiredPaceOrSpeed();
         
         
-       //startGraphActivity(RealtimeGraph.class);  // Only allow one activity. It is a mess trying to run multiple activity concurrently. 
+//       startGraphActivity(RealtimeGraph.class);  // Only allow one activity. It is a mess trying to run multiple activity concurrently. 
         
 //        // real time graph 
 //		((Button) findViewById(R.id.realtimegraph)).setOnClickListener(new OnClickListener() {
@@ -266,17 +427,58 @@ public class SensorPedometer extends Activity {
 //			}
 //		});
         
+        //for real time graph
+        sManager.registerListener(this, sensor ,SensorManager.SENSOR_DELAY_FASTEST);
+		
+		mTimer1 = new Runnable() {
+			@Override
+			public void run() {			
+				GraphViewData[] gvd = new GraphViewData[seriesX.size()];				
+				seriesX.toArray(gvd);
+				exampleSeries1.resetData(gvd);
+				mHandler2.post(this); //, 100);
+			}
+		};
+		mHandler2.postDelayed(mTimer1, 50);
+
+		mTimer2 = new Runnable() {
+			@Override
+			public void run() {
+				
+				GraphViewData[] gvd = new GraphViewData[seriesY.size()];				
+				seriesY.toArray(gvd);
+				exampleSeries2.resetData(gvd);
+
+				mHandler2.post(this);
+			}
+		};
+		mHandler2.postDelayed(mTimer2, 50);
+
+	
+		mTimer3 = new Runnable() {
+			@Override
+			public void run() {
+				
+				GraphViewData[] gvd = new GraphViewData[seriesZ.size()];				
+				seriesZ.toArray(gvd);
+				exampleSeries3.resetData(gvd);
+
+				mHandler2.post(this);
+			}
+		};
+		mHandler2.postDelayed(mTimer3, 50);
+        
     }
     
-    /*
-	private void startGraphActivity(Class<? extends Activity> activity) {
-		Intent intent = new Intent(SensorPedometer.this, activity);
-		//intent.setFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);  // to run to activities at the same time...?
-		intent.putExtra("type", "line");
-		
-		startActivity(intent); 
-	}
-	*/
+    
+//	private void startGraphActivity(Class<? extends Activity> activity) {
+//		Intent intent = new Intent(SensorPedometer.this, activity);
+//		//intent.setFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);  // to run to activities at the same time...?
+//		intent.putExtra("type", "line");
+//		
+//		startActivity(intent); 
+//	}
+	
     
     
     // this class is for streaming to ipaddress
@@ -340,6 +542,10 @@ public class SensorPedometer extends Activity {
     @Override
     protected void onPause() {
         Log.i(TAG, "[ACTIVITY] onPause");
+        // for real time graph
+		mHandler2.removeCallbacks(mTimer1);
+		mHandler2.removeCallbacks(mTimer2);
+		
         if (mIsRunning) {
             unbindStepService();
         }
@@ -350,6 +556,7 @@ public class SensorPedometer extends Activity {
             mPedometerSettings.saveServiceRunningWithTimestamp(mIsRunning);
         }
 
+        
         super.onPause();
         savePaceSetting();
     }
@@ -357,8 +564,12 @@ public class SensorPedometer extends Activity {
     @Override
     protected void onStop() {
         Log.i(TAG, "[ACTIVITY] onStop");
+        // for real time graph
+		sManager.unregisterListener(this);
         super.onStop();
     }
+    
+
 
     protected void onDestroy() {
         Log.i(TAG, "[ACTIVITY] onDestroy");

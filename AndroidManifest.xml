@@ -25,7 +25,7 @@
             </intent-filter>
         </activity>
         
-        <activity android:name=".RealtimeGraph"></activity>
+<!--         <activity android:name=".RealtimeGraph"></activity> -->
         
         <activity android:name=".Settings"
                 android:label="@string/activity_settings">
@@ -35,7 +35,7 @@
             </intent-filter>
         </activity>
         
-		<activity android:name=".subactivity.RealtimeGraph" />
+<!-- 		<activity android:name=".subactivity.RealtimeGraph" /> -->
         
         <service android:name=".StepService"/>
 

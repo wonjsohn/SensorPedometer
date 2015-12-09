@@ -24,8 +24,11 @@ import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 
+import android.content.ServiceConnection;
+
 //@TargetApi(Build.VERSION_CODES.JELLY_BEAN) 
 public class RealtimeGraph extends Activity implements SensorEventListener {
+//	public class RealtimeGraph extends Activity  {	
 	private final Handler mHandler = new Handler();
 	private Runnable mTimer1;
 	private Runnable mTimer2;
@@ -47,6 +50,9 @@ public class RealtimeGraph extends Activity implements SensorEventListener {
 	//the Sensor Manager
 	private SensorManager sManager;
 	private Sensor sensor;
+	
+	// acc data from stepservice...
+	
 
 	/** Called when the activity is first created. */
 	@Override
@@ -58,9 +64,13 @@ public class RealtimeGraph extends Activity implements SensorEventListener {
 		seriesY = new ArrayList<GraphViewData>();
 		seriesZ = new ArrayList<GraphViewData>();
 		
+		
         //get a hook to the sensor service
         sManager = (SensorManager) getSystemService(SENSOR_SERVICE);
         sensor = sManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+
+		
+		
         
 		// init example series data
 		exampleSeries1 = new GraphViewSeries(new GraphViewData[] {});		
@@ -129,7 +139,10 @@ public class RealtimeGraph extends Activity implements SensorEventListener {
 //		}
 		
 		
-	    //Sensor sensor = event.sensor; 
+//	    Sensor sensor = event.sensor; 
+		
+		
+
 	    
 	    if (sManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) != null) {
 			// success! we have an accelerometer
@@ -194,9 +207,13 @@ public class RealtimeGraph extends Activity implements SensorEventListener {
 		super.onPause();
 	}
 
+	 private StepService mService;
+	
 	@Override
 	protected void onResume() {
 		super.onResume();
+		
+				
 		
 		// TYPE_ORIENTATION works. all other doesn't. why?
 		//sManager.registerListener(this, sManager.getDefaultSensor(Sensor.TYPE_ORIENTATION),SensorManager.SENSOR_DELAY_FASTEST);
