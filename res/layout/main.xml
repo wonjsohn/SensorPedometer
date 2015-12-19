@@ -245,38 +245,44 @@
 	       android:layout_weight="76.33"
 	       android:orientation="vertical" >
 	
-	       <Button
-	           android:id="@+id/realtimegraph"
+
+	       <ToggleButton
+	           android:id="@+id/datalog"
 	           android:layout_width="match_parent"
 	           android:layout_height="wrap_content"
-	           android:text="real_time_graph" />
+	           android:text="data logging" />
 	
 	   </LinearLayout>
 	   
 	   <!--  graphing -->
-	   
+	   		<LinearLayout
+			    android:orientation="vertical"
+				android:layout_width="fill_parent"
+				android:layout_height="100dip"
+				android:id="@+id/graph00" />
+	   		
 		   	<LinearLayout
 			    android:orientation="vertical"
 				android:layout_width="fill_parent"
-				android:layout_height="140dip"
+				android:layout_height="100dip"
 				android:id="@+id/graph0" />
 	
 	   		<LinearLayout
 			    android:orientation="vertical"
 				android:layout_width="fill_parent"
-				android:layout_height="140dip"
+				android:layout_height="100dip"
 				android:id="@+id/graph1" />
 	
 			<LinearLayout
 			    android:id="@+id/graph2"
 			    android:layout_width="fill_parent"
-			    android:layout_height="140dip"
+			    android:layout_height="100dip"
 			    android:orientation="vertical" />
 			
 			<LinearLayout
 			    android:id="@+id/graph3"
 			    android:layout_width="fill_parent"
-			    android:layout_height="140dip"
+			    android:layout_height="100dip"
 			    android:orientation="vertical" />
 		</LinearLayout>
    

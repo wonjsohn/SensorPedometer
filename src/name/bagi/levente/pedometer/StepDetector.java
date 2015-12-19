@@ -57,7 +57,7 @@ public class StepDetector implements SensorEventListener
         mScale[0] = - (h * 0.5f * (1.0f / (SensorManager.STANDARD_GRAVITY * 2)));
         mScale[1] = - (h * 0.5f * (1.0f / (SensorManager.MAGNETIC_FIELD_EARTH_MAX)));
         step = 0; //initial value
-        Log.d("Sohn", "Mag field max =" + SensorManager.MAGNETIC_FIELD_EARTH_MAX ); //60
+        //Log.d("Sohn", "Mag field max =" + SensorManager.MAGNETIC_FIELD_EARTH_MAX ); //60
     }
     
     public void setSensitivity(float sensitivity) {
@@ -79,14 +79,14 @@ public class StepDetector implements SensorEventListener
                 if (j == 1) {
                     float vSum = 0;
                     for (int i=0 ; i<3 ; i++) {
-                        final float v = mYOffset + event.values[i] * mScale[j]; //event.values: x, y, z?
+                        final float v = mYOffset + event.values[i] * mScale[j]; // why not squared?  j not 0?
                         vSum += v;
                     }
                     int k = 0;
                     float v = vSum / 3;
                     acc_net = v;  // to access acc from outside
                     
-                    float direction = (v > mLastValues[k] ? 1 : (v < mLastValues[k] ? -1 : 0));
+                    float direction = ((v > mLastValues[k]) ? 1 : ((v < mLastValues[k]) ? -1 : 0));
                     if (direction == - mLastDirections[k]) {
                         // Direction changed
                         int extType = (direction > 0 ? 0 : 1); // minumum or maximum?

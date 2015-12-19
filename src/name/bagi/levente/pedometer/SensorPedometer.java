@@ -1,7 +1,7 @@
 /*
- *  Sensor + Pedometer - Android App
  *  Copyright (C) 2009 Levente Bagi, Enhanced by Won Joon (Eric) Sohn, 2015. 
  *
+ *  Sensor + Pedometer - Android App
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation, either version 3 of the License, or
@@ -18,13 +18,17 @@
 
 package name.bagi.levente.pedometer;
 
-
+import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 //import java.math.round;
 
@@ -67,7 +71,9 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import android.hardware.SensorManager;
-
+import java.io.File;
+import java.text.DecimalFormat;
+import java.text.SimpleDateFormat;
 
 public class SensorPedometer extends Activity implements SensorEventListener  {
 //public class SensorPedometer extends Activity {
@@ -87,16 +93,18 @@ public class SensorPedometer extends Activity implements SensorEventListener  {
     //private Button connectPhones;
     private String serverIpAddress = "192.168.0.104";
     private boolean connected = false;   // wifi connectivity
+    private boolean writing = false;   // writing to file
     boolean acc_disp = false;
     EditText port;
     EditText ipAdr;
     TextView mStatus;
     ToggleButton mlogWifiToggleButton1;
+    ToggleButton mDatalog;
     PrintWriter out;
    
     // acceleration and step detection related. 
     //private StepDetector mStepDector;
-    private  double acc_net = 0;
+    public  double acc_net = 0;
     private int step=0;
     
     TextView mDesiredPaceView;
@@ -112,24 +120,41 @@ public class SensorPedometer extends Activity implements SensorEventListener  {
     private boolean mQuitting = false; // Set when user selected Quit from menu, can be used by onPause, onStop, onDestroy
     
     
+//    /*write to file*/
+    private String acc;
+    private String read_str = "";
+   // String fileName = "acc.txt"; //new SimpleDateFormat("yyyyMMddhhmm.txt'").format(new Date()); // time stamp in the file name
+    String fileName = new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss").format(new Date());
+    private final String filepath = "/mnt/sdcard/" + fileName + "_R.txt"; //TODO: add time tag to file name
+    private BufferedWriter mBufferedWriter;
+    private BufferedReader mBufferedReader;
+ 
+ 
+    
     // for real time graph
-	private final Handler mHandler2 = new Handler();  // check if commenting this produce trouble
+	private final Handler mHandler2 = new Handler();  // check if commenting out this produce trouble
+	private Runnable mTimer00;
 	private Runnable mTimer0;
 	private Runnable mTimer1;
 	private Runnable mTimer2;
 	private Runnable mTimer3;	
+	private Runnable r;
+	private GraphView graphView00;
 	private GraphView graphView0;
 	private GraphView graphView1;
 	private GraphView graphView2;
 	private GraphView graphView3;
+	private GraphViewSeries exampleStepSeries0;
 	private GraphViewSeries exampleSeries0;
 	private GraphViewSeries exampleSeries1;
 	private GraphViewSeries exampleSeries2;
 	private GraphViewSeries exampleSeries3;
+	private double sensorStep = 235;  // mOffset  - 5
 	private double sensorXYZ = 0;  // calculated weight xyz acc mean 
 	private double sensorX = 0;
 	private double sensorY = 0;
 	private double sensorZ = 0;
+	private List<GraphViewData> seriesStep;
 	private List<GraphViewData> seriesXYZ;
 	private List<GraphViewData> seriesX;
 	private List<GraphViewData> seriesY;
@@ -139,8 +164,17 @@ public class SensorPedometer extends Activity implements SensorEventListener  {
 	//the Sensor Manager
 	private SensorManager sManager;
 	private Sensor sensor;
+	
+	private int h;
+	private float   mScale[] = new float[2];
+    private float   mYOffset;
     
-
+    DecimalFormat df = new DecimalFormat("##.####");
+    
+    // time tag
+    static int ACCE_FILTER_DATA_MIN_TIME = 1; // 1ms delay. ~35hz is a limiting sampling rate now. why?
+    long lastSaved = System.currentTimeMillis();
+    
     /**
      * True, when service is running.
      */
@@ -161,13 +195,11 @@ public class SensorPedometer extends Activity implements SensorEventListener  {
         acc_disp =false;
         
         // for real time graph
+        seriesStep = new ArrayList<GraphViewData>();
         seriesXYZ = new ArrayList<GraphViewData>();
         seriesX = new ArrayList<GraphViewData>();
 		seriesY = new ArrayList<GraphViewData>();
 		seriesZ = new ArrayList<GraphViewData>();
-		
-	
-		
 		
 		
         //get a hook to the sensor service
@@ -176,9 +208,24 @@ public class SensorPedometer extends Activity implements SensorEventListener  {
         Log.i(TAG, "[onCreate] sensor registered ");
 		
 		
-        
+       
 		// init example series data
         
+        // step series 
+        exampleStepSeries0 = new GraphViewSeries(new GraphViewData[] {});	
+        graphView00 = new LineGraphView(
+				this // context
+				, "step" // heading
+		);
+        graphView00.addSeries(exampleStepSeries0); // data
+        
+        LinearLayout layout = (LinearLayout) findViewById(R.id.graph00);
+		layout.addView(graphView00);
+        
+		Log.i(TAG, "[onCreate] graph00 registered ");
+        
+        
+		// group ACC
         exampleSeries0 = new GraphViewSeries(new GraphViewData[] {});	
 
 		graphView0 = new LineGraphView(
@@ -186,9 +233,10 @@ public class SensorPedometer extends Activity implements SensorEventListener  {
 				, "Group ACC" // heading
 		);
 
-
+		
 		graphView0.addSeries(exampleSeries0); // data
-		LinearLayout layout = (LinearLayout) findViewById(R.id.graph0);
+		
+		layout = (LinearLayout) findViewById(R.id.graph0);
 		layout.addView(graphView0);
 
 		Log.i(TAG, "[onCreate] graph0 registered ");
@@ -198,7 +246,7 @@ public class SensorPedometer extends Activity implements SensorEventListener  {
 
 		graphView1 = new LineGraphView(
 				this // context
-				, "ACC-X" // heading
+				, "ACC-Z" // heading
 		);
 
 
@@ -227,14 +275,20 @@ public class SensorPedometer extends Activity implements SensorEventListener  {
 
 		graphView3 = new LineGraphView(
 				this // context
-				, "ACC-Z" // heading
+				, "ACC-X" // heading
 		);
 		
 		graphView3.addSeries(exampleSeries3); // data
 		layout = (LinearLayout) findViewById(R.id.graph3);
 		layout.addView(graphView3);
 		
-        
+		
+		// Net Acceleration adjustment
+		h = 480; // TODO: remove this constant
+        mYOffset = h * 0.5f;
+        mScale[0] = - (h * 0.5f * (1.0f / (SensorManager.STANDARD_GRAVITY * 2)));
+        mScale[1] = - (h * 0.5f * (1.0f / (SensorManager.MAGNETIC_FIELD_EARTH_MAX)));
+        step = 0; //initial value
     }
     
     
@@ -245,53 +299,66 @@ public class SensorPedometer extends Activity implements SensorEventListener  {
 //	    Sensor sensor = event.sensor; 
   
 	    if (sManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) != null) {
-			// success! we have an accelerometer
-	    	
-	    	// THESE TWO LINES NEED TO BE IMPROVED. WHY DOES IT WORK THIS 
-	    	Thread accThread1 = new Thread(new AccThread());
-            accThread1.start();
-
-	    	sensorXYZ = acc_net;  // not sure if this gets a snapshot value of acc_net upon sensor event
-	    	//sensorXYZ = mService.mStepDetector.acc_net;
-	    	
-	    	
-	    	
-			sensorX = event.values[2];
-//			Log.d("MYAPP", "sensorX " + sensorX);
-			sensorY = event.values[1];
-			sensorZ = event.values[0];
-	
-			seriesXYZ.add(new GraphViewData(dataCount, sensorXYZ));
-			seriesX.add(new GraphViewData(dataCount, sensorX));
-			seriesY.add(new GraphViewData(dataCount, sensorY));
-			seriesZ.add(new GraphViewData(dataCount, sensorZ));
-	    
-			dataCount++;
-		
-		
-	/*		Context context = getApplicationContext();
-			float number = (float)Math.round(sensorX * 1000) / 1000;
-			//string formattedNumber = Float.toString(number);
-			CharSequence text = Float.toString(number);
-			int duration = Toast.LENGTH_SHORT;
-			Toast toast = Toast.makeText(context, text, duration);
-			toast.show();
-	*/		
-			if (seriesX.size() > 500) {
-				seriesXYZ.remove(0);
-				seriesX.remove(0);
-				seriesY.remove(0);
-				seriesZ.remove(0);
-				graphView0.setViewPort(dataCount - 500, 500);
-				graphView1.setViewPort(dataCount - 500, 500);
-				graphView2.setViewPort(dataCount - 500, 500);
-				graphView3.setViewPort(dataCount - 500, 500);
-			}
-	    }
-	    else {
-		// fail! we dont have an accelerometer!
-	    	Log.d("MYAPP", "no acc");
-	    	Toast.makeText(this, "No accelerometer", Toast.LENGTH_LONG).show();
+	    	if ((System.currentTimeMillis() - lastSaved) > ACCE_FILTER_DATA_MIN_TIME) {  
+	            lastSaved = System.currentTimeMillis();	   
+//	    	acc_net = mService.mStepDetector.acc_net;	    	
+//	    	sensorXYZ = acc_net;  // not sure if this gets a snapshot value of acc_net upon sensor event
+ 		   
+				sensorX = event.values[2];
+	//			Log.d("MYAPP", "sensorX " + sensorX);
+				sensorY = event.values[1];
+				sensorZ = event.values[0];
+				float vSum = 0;
+				for (int i=0 ; i<3 ; i++) {
+	                final float v = mYOffset + event.values[i] * mScale[0]; // why not squared? 
+	                vSum += v;
+	            }
+				float v = vSum /3;
+			
+				sensorXYZ = Math.sqrt(v);
+				
+				sensorStep = mStepValue;
+				seriesStep.add(new GraphViewData(dataCount, sensorStep));
+				seriesXYZ.add(new GraphViewData(dataCount, sensorXYZ));
+				seriesX.add(new GraphViewData(dataCount, sensorX));
+				seriesY.add(new GraphViewData(dataCount, sensorY));
+				seriesZ.add(new GraphViewData(dataCount, sensorZ));
+		    
+				dataCount++;
+				
+				// to write , % operator might slight slow reading rate??
+				acc= String.valueOf(df.format(lastSaved%100000)) + "," + String.valueOf(df.format(sensorStep)) + "," + String.valueOf(df.format(sensorXYZ)) + "," + String.valueOf(df.format(sensorX)) + "," + String.valueOf(df.format(sensorY)) + "," + String.valueOf(df.format(sensorZ));
+				
+			
+		/*		Context context = getApplicationContext();
+				float number = (float)Math.round(sensorX * 1000) / 1000;
+				//string formattedNumber = Float.toString(number);
+				CharSequence text = Float.toString(number);
+				int duration = Toast.LENGTH_SHORT;
+				Toast toast = Toast.makeText(context, text, duration);
+				toast.show();
+		*/		
+				if (seriesX.size() > 500) {
+					seriesStep.remove(0);
+					seriesXYZ.remove(0);
+					seriesX.remove(0);
+					seriesY.remove(0);
+					seriesZ.remove(0);
+					graphView0.setViewPort(dataCount - 500, 500);
+					graphView1.setViewPort(dataCount - 500, 500);
+					graphView2.setViewPort(dataCount - 500, 500);
+					graphView3.setViewPort(dataCount - 500, 500);
+				}
+		    }
+		    else {
+			// fail! we dont have an accelerometer!
+		    	Log.d("MYAPP", "no acc");
+		    	Toast.makeText(this, "No accelerometer", Toast.LENGTH_LONG).show();
+		    }
+		    
+		    /*write to file */
+		   // WriteFile(filepath,acc);
+		    //mSensorLog.logSensorEvent(event);
 	    }
 	}
 	
@@ -302,9 +369,10 @@ public class SensorPedometer extends Activity implements SensorEventListener  {
 	{
 		//Do nothing.
 	}
-    
-    
-    
+   
+
+        
+       
     
     @Override
     protected void onStart() {
@@ -342,6 +410,7 @@ public class SensorPedometer extends Activity implements SensorEventListener  {
         
         mStatus  = (TextView) findViewById(R.id.status);
         mlogWifiToggleButton1 = (ToggleButton) findViewById(R.id.logWifiToggleButton1);
+        mDatalog = (ToggleButton) findViewById(R.id.datalog);
         //mSpeedValueView    = (TextView) findViewById(R.id.speed_value);
         //mCaloriesValueView = (TextView) findViewById(R.id.calories_value);
        
@@ -445,69 +514,116 @@ public class SensorPedometer extends Activity implements SensorEventListener  {
 //		});
 		
 		 //Advanced multiple series graph
-		((Button) findViewById(R.id.realtimegraph)).setOnClickListener(new OnClickListener() {
+		((ToggleButton) findViewById(R.id.datalog)).setOnClickListener(new OnClickListener() {
 			@Override
 			public void onClick(View v) {
-				//startGraphActivity(AdvancedMultipleSeriesGraph.class);
-				Thread accThread1 = new Thread(new AccThread());
-                accThread1.start();
-				
+				 if (!writing) {
+					//startGraphActivity(AdvancedMultipleSeriesGraph.class);
+					 writing = true;
+					Thread accThread1 = new Thread(new AccThread());
+	                accThread1.start();
+	                }
+				 else{
+						//                	 accThread1.kill();
+		        	 mDatalog.setText("Writing stopped");
+		        	 writing = false;
+				 }
 			}
 		});
+		
+	
+//       mDatalog.setOnClickListener(new View.OnClickListener() {
+//            public void onClick(View v) {
+//                // TODO 
+////	        	 if (!writing) {
+////	                    
+//	                 	//text.setText("onclick if");  exception occurs
+//	            		 writing = true;
+//	                	 Thread accThread1 = new Thread(new AccThread());
+//	                     accThread1.start();
+//	                	 mDatalog.setText("Writing now");
+//	                	 
+//	                        
+//	                     
+////	             }
+////		         else{
+//		//                	 accThread1.kill();
+//		        	 mDatalog.setText("Writing stopped");
+//		        	 writing = false;
+//		             //connectPhones.setText("don't expect here");
+////		         }
+//             }
+//         });
+		
         
         //for real time graph
         sManager.registerListener(this, sensor ,SensorManager.SENSOR_DELAY_FASTEST);
 		
         
-        mTimer0 = new Runnable() {
-			@Override
-			public void run() {		
-				GraphViewData[] gvd = new GraphViewData[seriesXYZ.size()];				
-				seriesXYZ.toArray(gvd);
-				exampleSeries0.resetData(gvd);
-				mHandler2.post(this); //, 100);
-			}
-		};
-		mHandler2.postDelayed(mTimer0, 50);
+//        mTimer00 = new Runnable() {
+//			@Override
+//			public void run() {		
+//				GraphViewData[] gvd = new GraphViewData[seriesStep.size()];				
+//				seriesStep.toArray(gvd);				
+//				exampleStepSeries0.resetData(gvd);
+//				mHandler2.post(this); //, 100);
+//			}
+//		};
+//		mHandler2.postDelayed(mTimer00, 50);
         
-		mTimer1 = new Runnable() {
-			@Override
-			public void run() {			
-				GraphViewData[] gvd = new GraphViewData[seriesX.size()];				
-				seriesX.toArray(gvd);
-				exampleSeries1.resetData(gvd);
-				mHandler2.post(this); //, 100);
-			}
-		};
-		mHandler2.postDelayed(mTimer1, 50);
+//        
+//        mTimer0 = new Runnable() {
+//			@Override
+//			public void run() {		
+//				GraphViewData[] gvd = new GraphViewData[seriesXYZ.size()];				
+//				seriesXYZ.toArray(gvd);				
+//				exampleSeries0.resetData(gvd);
+//				mHandler2.post(this); //, 100);
+//			}
+//		};
+//		mHandler2.postDelayed(mTimer0, 50);
+//        
+//		mTimer1 = new Runnable() {
+//			@Override
+//			public void run() {			
+//				GraphViewData[] gvd = new GraphViewData[seriesX.size()];				
+//				seriesX.toArray(gvd);
+//				exampleSeries1.resetData(gvd);
+//				mHandler2.post(this); //, 100);
+//			}
+//		};
+//		mHandler2.postDelayed(mTimer1, 50);
 
-		mTimer2 = new Runnable() {
-			@Override
-			public void run() {
-				
-				GraphViewData[] gvd = new GraphViewData[seriesY.size()];				
-				seriesY.toArray(gvd);
-				exampleSeries2.resetData(gvd);
-
-				mHandler2.post(this);
-			}
-		};
-		mHandler2.postDelayed(mTimer2, 50);
+//		mTimer2 = new Runnable() {
+//			@Override
+//			public void run() {
+//				
+//				GraphViewData[] gvd = new GraphViewData[seriesY.size()];				
+//				seriesY.toArray(gvd);
+//				exampleSeries2.resetData(gvd);
+//
+//				mHandler2.post(this);
+//			}
+//		};
+//		mHandler2.postDelayed(mTimer2, 50);
 
 	
-		mTimer3 = new Runnable() {
-			@Override
-			public void run() {
-				
-				GraphViewData[] gvd = new GraphViewData[seriesZ.size()];				
-				seriesZ.toArray(gvd);
-				exampleSeries3.resetData(gvd);
-
-				mHandler2.post(this);
-			}
-		};
-		mHandler2.postDelayed(mTimer3, 50);
-        
+//		mTimer3 = new Runnable() {
+//			@Override
+//			public void run() {
+//				
+//				GraphViewData[] gvd = new GraphViewData[seriesZ.size()];				
+//				seriesZ.toArray(gvd);
+//				exampleSeries3.resetData(gvd);
+//
+//				mHandler2.post(this);
+//			}
+//		};
+//		mHandler2.postDelayed(mTimer3, 50);
+//		
+		
+		
+		
     }
     
     
@@ -520,16 +636,45 @@ public class SensorPedometer extends Activity implements SensorEventListener  {
 //	}
 	
     public class AccThread implements Runnable {
-    	public void run() {
-    		try{
-    			acc_net = mService.mStepDetector.acc_net;
-    		}catch(Exception e) {
-            	//throw new RuntimeException(e);  //falls here? 
-            	Log.e("MYAPP", "acc thread exception", e);
-            	//statustext.setText("run catch"); // exception occurs
-            }
-    	}
-    }
+
+        @Override
+        public void run () {
+
+        	while(writing)
+            {
+//                    Message msg1 = new Message();
+                try 
+                {
+                    WriteFile(filepath,acc);
+//                        msg1.what = MSG_DONE;
+//                        msg1.obj = "Start to write to SD 'acc.txt'";
+                    Thread.sleep(1);  // 2 to 1 doesn't make differnce in sensor sampling rate.  
+                } 
+                catch (Exception e) 
+                {
+                	e.printStackTrace();
+//                        msg1.what = MSG_ERROR;
+//                        msg1.obj = e.getMessage();
+                }
+//                    uiHandler.sendMessage(msg1);
+//                Message msg2 = new Message();
+//                msg2.what = MSG_STOP;
+//                msg2.obj = "Stop to write to SD 'acc.txt'";
+//                uiHandler.sendMessage(msg2);
+
+//                try {
+//                    Thread.sleep(500);
+//                } catch (InterruptedException e) {
+//                    // TODO Auto-generated catch block
+//                    e.printStackTrace();
+//                }
+	                
+	            
+        	}
+        
+        }
+ 
+    };
     
     
     // this class is for streaming to ipaddress
@@ -621,6 +766,7 @@ public class SensorPedometer extends Activity implements SensorEventListener  {
     protected void onStop() {
         Log.i(TAG, "[ACTIVITY] onStop");
         // for real time graph
+
 		sManager.unregisterListener(this);
         super.onStop();
     }
@@ -885,6 +1031,58 @@ public class SensorPedometer extends Activity implements SensorEventListener  {
             mStatus.setText(output);
         }
     }
+
+
+
+	// Below here starts write to file.
+	
+	public void CreateFile(String path)
+	{
+	    File f = new File(path);
+	    try {
+	        Log.d("ACTIVITY", "Create a File.");
+	        f.createNewFile();
+	    } catch (IOException e) {
+	        // TODO Auto-generated catch block
+	        e.printStackTrace();
+	    }
+	}
+
+
+	public void WriteFile(String filepath, String str)
+	{
+	    mBufferedWriter = null;
+	
+	    if (!FileIsExist(filepath))
+	        CreateFile(filepath);
+	
+	    try 
+	    {
+	        mBufferedWriter = new BufferedWriter(new FileWriter(filepath, true)); // Writer is to characters when Outputstream is to bytes.  
+	        mBufferedWriter.write(str);
+	        mBufferedWriter.newLine();
+	        mBufferedWriter.flush();
+	       // mBufferedWriter.close(); //why close?
+	    }
+	    catch (IOException e) 
+	    {
+	        // TODO Auto-generated catch block
+	        e.printStackTrace();
+	    }
+	}
+	
+	public boolean FileIsExist(String filepath)
+	{
+	    File f = new File(filepath);
+	
+	    if (! f.exists())
+	    {
+	        Log.e("ACTIVITY", "File does not exist.");
+	        return false;
+	    }
+	    else
+	        return true;
+	}
+
 }
-    
 
