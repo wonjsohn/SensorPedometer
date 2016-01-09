@@ -64,7 +64,8 @@ public class StepService extends Service {
     private SensorManager mSensorManager;
     private Sensor mSensor;
     //private StepDetector mStepDetector;
-    public StepDetector mStepDetector;  // to access from outside : eric
+//    public StepDetector mStepDetector;  // to access from outside : eric
+    public StepDetector2 mStepDetector;  // 
     // private StepBuzzer mStepBuzzer; // used for debugging
     private StepDisplayer mStepDisplayer;
     private PaceNotifier mPaceNotifier;
@@ -113,7 +114,8 @@ public class StepService extends Service {
         acquireWakeLock();
         
         // Start detecting
-        mStepDetector = new StepDetector();
+//        mStepDetector = new StepDetector();
+        mStepDetector = new StepDetector2();
         mSensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
         registerDetector();
 

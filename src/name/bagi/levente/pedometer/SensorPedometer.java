@@ -118,7 +118,9 @@ public class SensorPedometer extends Activity implements SensorEventListener  {
     private boolean mIsMetric;
     private float mMaintainInc;
     private boolean mQuitting = false; // Set when user selected Quit from menu, can be used by onPause, onStop, onDestroy
-    
+    private float   mLastValues[] = new float[3*2]; 
+    private float   mLastValues_hr[] = new float[3*2]; 
+    private float   mLastValues_fwa[] = new float[3*2]; 
     
 //    /*write to file*/
     private String acc;
@@ -151,11 +153,14 @@ public class SensorPedometer extends Activity implements SensorEventListener  {
 	private GraphViewSeries exampleSeries3;
 	private double sensorStep = 235;  // mOffset  - 5
 	private double sensorXYZ = 0;  // calculated weight xyz acc mean 
+	private double sensorXYZ_HR = 0;  // Hanning recursive filter 
+	private double sensorXYZ_fwa = 0;  //five point weighted average filter 
 	private double sensorX = 0;
 	private double sensorY = 0;
 	private double sensorZ = 0;
 	private List<GraphViewData> seriesStep;
 	private List<GraphViewData> seriesXYZ;
+	private List<GraphViewData> seriesXYZ_HR;  //Hanning recursive filter
 	private List<GraphViewData> seriesX;
 	private List<GraphViewData> seriesY;
 	private List<GraphViewData> seriesZ;
@@ -196,7 +201,7 @@ public class SensorPedometer extends Activity implements SensorEventListener  {
         
         // for real time graph
         seriesStep = new ArrayList<GraphViewData>();
-        seriesXYZ = new ArrayList<GraphViewData>();
+        seriesXYZ_HR = new ArrayList<GraphViewData>();
         seriesX = new ArrayList<GraphViewData>();
 		seriesY = new ArrayList<GraphViewData>();
 		seriesZ = new ArrayList<GraphViewData>();
@@ -308,18 +313,43 @@ public class SensorPedometer extends Activity implements SensorEventListener  {
 	//			Log.d("MYAPP", "sensorX " + sensorX);
 				sensorY = event.values[1];
 				sensorZ = event.values[0];
-				float vSum = 0;
+//				float vSum = 0;
+				float vvSum = 0;
 				for (int i=0 ; i<3 ; i++) {
-	                final float v = mYOffset + event.values[i] * mScale[0]; // why not squared? 
-	                vSum += v;
+	                //final float v = mYOffset + event.values[i] * mScale[1]; // 1 for accelerometer.
+					final float vv = event.values[i]*event.values[i]; 
+//	                vSum += v;
+	                vvSum += vv;
 	            }
-				float v = vSum /3;
-			
-				sensorXYZ = Math.sqrt(v);
+				//float v = vSum /3;
 				
+				float v = (float) Math.sqrt(vvSum);
+				
+				//** no filter (raw)
+				
+				
+                //** Hanning filter 
+                
+				
+				//**  Hanning recursive smoothing technique (filtering)  -added by Eric Sohn
+				float v_hr = (float) 0.25*(v + 2* mLastValues_hr[0]  + mLastValues_hr[1]);
+                //mLastValues[2] = mLastValues[1]; // shift left
+                mLastValues_hr[1] = mLastValues_hr[0]; // shift left
+                mLastValues_hr[0] = v_hr; // shift left
+				
+                //** five-point weighted average method (Eric defined ver)  
+                float v_fwa = (float) 0.25*(v +  mLastValues_fwa[0]  + mLastValues_fwa[1] + mLastValues_fwa[2]);
+                mLastValues_fwa[2] = mLastValues_fwa[1]; // shift left
+                mLastValues_fwa[1] = mLastValues_fwa[0]; // shift left
+                mLastValues_fwa[0] = v; // shift left
+                
+                
+                sensorXYZ = v;
+                sensorXYZ_HR = v_hr;
+                sensorXYZ_fwa = v_fwa;
 				sensorStep = mStepValue;
 				seriesStep.add(new GraphViewData(dataCount, sensorStep));
-				seriesXYZ.add(new GraphViewData(dataCount, sensorXYZ));
+				seriesXYZ_HR.add(new GraphViewData(dataCount, sensorXYZ_HR));
 				seriesX.add(new GraphViewData(dataCount, sensorX));
 				seriesY.add(new GraphViewData(dataCount, sensorY));
 				seriesZ.add(new GraphViewData(dataCount, sensorZ));
@@ -327,7 +357,9 @@ public class SensorPedometer extends Activity implements SensorEventListener  {
 				dataCount++;
 				
 				// to write , % operator might slight slow reading rate??
-				acc= String.valueOf(df.format(lastSaved%100000)) + "," + String.valueOf(df.format(sensorStep)) + "," + String.valueOf(df.format(sensorXYZ)) + "," + String.valueOf(df.format(sensorX)) + "," + String.valueOf(df.format(sensorY)) + "," + String.valueOf(df.format(sensorZ));
+				// time, step, sensorXYZ_HR, sensorXYZ_fwa, sensorXYZ, sensorX, sensorY, sensorZ
+				acc= String.valueOf(df.format(lastSaved%100000)) + "," + String.valueOf(df.format(sensorStep)) + "," + String.valueOf(df.format(sensorXYZ_HR)) + "," 
+						+ String.valueOf(df.format(sensorXYZ_fwa)) + "," + String.valueOf(df.format(sensorXYZ)) + "," + String.valueOf(df.format(sensorX)) + "," + String.valueOf(df.format(sensorY)) + "," + String.valueOf(df.format(sensorZ));
 				
 			
 		/*		Context context = getApplicationContext();
@@ -340,7 +372,7 @@ public class SensorPedometer extends Activity implements SensorEventListener  {
 		*/		
 				if (seriesX.size() > 500) {
 					seriesStep.remove(0);
-					seriesXYZ.remove(0);
+					seriesXYZ_HR.remove(0);
 					seriesX.remove(0);
 					seriesY.remove(0);
 					seriesZ.remove(0);

@@ -32,8 +32,12 @@ import android.util.Log;
  * Detects steps and notifies all listeners (that implement StepListener).
  * @author Levente Bagi
  * @todo REFACTOR: SensorListener is deprecated
+ * 
+ * @author Won Joon Sohn
+ * @modification acceleration in xyz quantified in different way: sqrt(x2 + y2 + z2) 
+ * 				various filters e.g. Hanning recursive filter added.   
  */
-public class StepDetector implements SensorEventListener
+public class StepDetector2 implements SensorEventListener
 {
     private final static String TAG = "StepDetector";
     private float   mLimit = 10;
@@ -51,7 +55,7 @@ public class StepDetector implements SensorEventListener
     
     private ArrayList<StepListener> mStepListeners = new ArrayList<StepListener>();
     
-    public StepDetector() {
+    public StepDetector2() {
         int h = 480; // TODO: remove this constant
         mYOffset = h * 0.5f;
         mScale[0] = - (h * 0.5f * (1.0f / (SensorManager.STANDARD_GRAVITY * 2)));
@@ -61,8 +65,10 @@ public class StepDetector implements SensorEventListener
     }
     
     public void setSensitivity(float sensitivity) {
-        mLimit = sensitivity; // 1.97  2.96  4.44  6.66  10.00  15.00  22.50  33.75  50.62
-        				     //exthigh vhigh high  higher med   lower  low    v low  extlow 
+        //mLimit = sensitivity; // 1.97  2.96  4.44  6.66  10.00  15.00  22.50  33.75  50.62
+        				     //exthigh vhigh high  higher med   lower  low    vlow  extlow
+    	float scaleFactor = 2;
+    	mLimit = sensitivity / scaleFactor;  // tune the factor
     }
     
     public void addStepListener(StepListener sl) {
@@ -78,16 +84,25 @@ public class StepDetector implements SensorEventListener
             else {
                 int j = (sensor.getType() == Sensor.TYPE_ACCELEROMETER) ? 1 : 0;
                 if (j == 1) {
-                    float vSum = 0;
+                    double vvSum = 0;
                     for (int i=0 ; i<3 ; i++) {
-                        final float v = mYOffset + event.values[i] * mScale[j]; // why not squared?  j not 0?
-                        vSum += v;
+                        //final float v = mYOffset + event.values[i] * mScale[j]; // why not squared?  j not 0?
+                        final float vv =  event.values[i]*event.values[i]; // square                      
+                        vvSum += vv;
                     }
                     int k = 0;
-                    float v = vSum / 3;
+                    float v = (float) (Math.sqrt(vvSum)); 
+                    
+                    
+                    //**  Hanning recursive smoohting technique (filtering). This is better than other filters. -added by Eric Sohn
+                    // y(t) = 1/4*[x(t) + 2y(t-1) + y(t-2)]
+                    float v_hr = (float) 0.25*(v + 2* mLastValues[0]  + mLastValues[1]); //mLastValues: previous filtered values 
+                    //mLastValues[2] = mLastValues[1]; // shift left
+                    
+                   
                     acc_net = v;  // to access acc from outside
                     
-                    float direction = ((v > mLastValues[k]) ? 1 : ((v < mLastValues[k]) ? -1 : 0));
+                    float direction = ((v_hr > mLastValues[k]) ? 1 : ((v_hr < mLastValues[k]) ? -1 : 0));
                     if (direction == - mLastDirections[k]) {
                         // Direction changed
                         int extType = (direction > 0 ? 0 : 1); // minumum or maximum?
@@ -115,7 +130,10 @@ public class StepDetector implements SensorEventListener
                         mLastDiff[k] = diff;
                     }
                     mLastDirections[k] = direction;
-                    mLastValues[k] = v;
+                    
+                    mLastValues[1] = mLastValues[0]; // shift left
+                    mLastValues[k] = v_hr;  // k = 0 here 
+                    
                 }
             }
         }
