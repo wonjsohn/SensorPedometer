@@ -126,9 +126,10 @@ public class SensorPedometer extends Activity implements SensorEventListener  {
     private String acc;
     private String read_str = "";
    // String fileName = "acc.txt"; //new SimpleDateFormat("yyyyMMddhhmm.txt'").format(new Date()); // time stamp in the file name
-    String fileName = new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss").format(new Date());
-    private final String filepath = "/mnt/sdcard/" + fileName + "_R.txt"; //TODO: add time tag to file name
-    private BufferedWriter mBufferedWriter;
+    String fileName;
+    private String filepath;
+    
+     private BufferedWriter mBufferedWriter;
     private BufferedReader mBufferedReader;
  
  
@@ -190,6 +191,11 @@ public class SensorPedometer extends Activity implements SensorEventListener  {
     public void onCreate(Bundle savedInstanceState) {
         Log.i(TAG, "[ACTIVITY] onCreate");
         super.onCreate(savedInstanceState);
+       
+        //time stamp related
+        fileName = new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss").format(new Date());
+        filepath = "/mnt/sdcard/" + fileName + "_R.txt"; //TODO: add time tag to file name
+       
         
         mStepValue = 0;
         mPaceValue = 0;
@@ -382,11 +388,12 @@ public class SensorPedometer extends Activity implements SensorEventListener  {
 					graphView3.setViewPort(dataCount - 500, 500);
 				}
 		    }
-		    else {
+	    }
+	    else {
 			// fail! we dont have an accelerometer!
 		    	Log.d("MYAPP", "no acc");
 		    	Toast.makeText(this, "No accelerometer", Toast.LENGTH_LONG).show();
-		    }
+		    
 		    
 		    /*write to file */
 		   // WriteFile(filepath,acc);
@@ -549,16 +556,42 @@ public class SensorPedometer extends Activity implements SensorEventListener  {
 		((ToggleButton) findViewById(R.id.datalog)).setOnClickListener(new OnClickListener() {
 			@Override
 			public void onClick(View v) {
-				 if (!writing) {
-					//startGraphActivity(AdvancedMultipleSeriesGraph.class);
-					 writing = true;
-					Thread accThread1 = new Thread(new AccThread());
-	                accThread1.start();
-	                }
+//				 if (!writing) {
+//					//startGraphActivity(AdvancedMultipleSeriesGraph.class);
+//					 writing = true;
+//					Thread accThread1 = new Thread(new AccThread());
+//	                accThread1.start();
+//	                }
+//				 else{
+//						//                	 accThread1.kill();
+//		        	 mDatalog.setText("Writing stopped");
+//		        	 writing = false;
+//				 }
+				 if (mDatalog.isChecked())  {  // On when tobble button is pushed.
+						//startGraphActivity(AdvancedMultipleSeriesGraph.class);
+						
+						Thread accThread1 = new Thread(new AccThread());
+		                accThread1.start();
+				 }
 				 else{
-						//                	 accThread1.kill();
-		        	 mDatalog.setText("Writing stopped");
-		        	 writing = false;
+//					     accThread1.kill();
+					    try 
+					    {				 
+					        mBufferedWriter.close(); //close buffer
+					        Log.d("ACTIVITY", "Close a File.");
+					    }
+					    catch (IOException e) 
+					    {
+					        // TODO Auto-generated catch block
+					        e.printStackTrace();
+					    }
+					     
+			        	 mDatalog.setText("Writing stopped");
+			        	 
+			        	 //create new file
+			        	 fileName = new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss").format(new Date());
+			        	 filepath = "/mnt/sdcard/" + fileName + "_R.txt"; //TODO: add time tag to file name
+			        	 
 				 }
 			}
 		});
@@ -672,7 +705,7 @@ public class SensorPedometer extends Activity implements SensorEventListener  {
         @Override
         public void run () {
 
-        	while(writing)
+        	while(mDatalog.isChecked())
             {
 //                    Message msg1 = new Message();
                 try 
@@ -703,6 +736,8 @@ public class SensorPedometer extends Activity implements SensorEventListener  {
 	                
 	            
         	}
+        	
+        	
         
         }
  
@@ -1090,11 +1125,17 @@ public class SensorPedometer extends Activity implements SensorEventListener  {
 	
 	    try 
 	    {
+//	    	if (!mDatalog.isChecked()) {
+//	    		Log.d("ACTIVITY", "Close file");
+//	    		mBufferedWriter.close();
+//	    	}else {
+	    	
 	        mBufferedWriter = new BufferedWriter(new FileWriter(filepath, true)); // Writer is to characters when Outputstream is to bytes.  
 	        mBufferedWriter.write(str);
 	        mBufferedWriter.newLine();
 	        mBufferedWriter.flush();
 	       // mBufferedWriter.close(); //why close?
+//	    	}
 	    }
 	    catch (IOException e) 
 	    {
@@ -1102,6 +1143,7 @@ public class SensorPedometer extends Activity implements SensorEventListener  {
 	        e.printStackTrace();
 	    }
 	}
+	
 	
 	public boolean FileIsExist(String filepath)
 	{
